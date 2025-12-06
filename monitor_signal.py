@@ -53,9 +53,10 @@ except ImportError:
 class SignalMonitor:
     """Monitor and log M7200 LTE signal statistics."""
 
-    def __init__(self, csv_file: str = "signal_log.csv", png_file: str = "signal_graph.png") -> None:
+    def __init__(self, csv_file: str = "signal_log.csv", png_file: str = "signal_graph.png", time_window_hours: float = 48.0) -> None:
         self.csv_file = Path(script_dir) / csv_file
         self.png_file = Path(script_dir) / png_file
+        self.time_window_hours = time_window_hours
         self.fieldnames = [
             "timestamp",
             "datetime",
@@ -158,6 +159,9 @@ class SignalMonitor:
         print(f"\nGenerating graph: {self.png_file}")
 
         try:
+            # Calculate cutoff time for filtering
+            cutoff_time = time.time() - (self.time_window_hours * 3600)
+            
             # Read CSV data
             timestamps: List[datetime] = []
             rsrp_values: List[Optional[float]] = []
@@ -170,6 +174,11 @@ class SignalMonitor:
                 for row in reader:
                     try:
                         ts = float(row["timestamp"])
+                        
+                        # Skip entries older than the time window
+                        if ts < cutoff_time:
+                            continue
+                        
                         timestamps.append(datetime.fromtimestamp(ts))
 
                         # Convert signal values to floats
@@ -331,12 +340,18 @@ Examples:
         default="signal_graph.png",
         help="PNG output file (default: signal_graph.png)",
     )
+    parser.add_argument(
+        "--graph-hours",
+        type=float,
+        default=48.0,
+        help="Hours of data to include in graph (default: 48.0)",
+    )
     parser.add_argument("--no-graph", action="store_true", help="Skip graph generation")
 
     args = parser.parse_args()
 
     # Create monitor instance
-    monitor = SignalMonitor(csv_file=args.csv, png_file=args.png)
+    monitor = SignalMonitor(csv_file=args.csv, png_file=args.png, time_window_hours=args.graph_hours)
 
     print("=" * 60)
     print("M7200 Signal Monitor")
